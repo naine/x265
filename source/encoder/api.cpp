@@ -229,6 +229,16 @@ x265_encoder *x265_encoder_open(x265_param *p)
         goto fail;
 
     x265_print_params(param);
+    {
+        char* opts = x265_param2string(param,
+            encoder->m_sps.conformanceWindow.rightOffset,
+            encoder->m_sps.conformanceWindow.bottomOffset);
+        if (opts)
+        {
+            x265_log(encoder->m_param, X265_LOG_INFO, "%s\n", opts);
+            X265_FREE(opts);
+        }
+    }
     return encoder;
 
 fail:

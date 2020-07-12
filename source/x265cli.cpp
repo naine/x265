@@ -400,24 +400,41 @@ namespace X265_NS {
 
     void CLIOptions::printStatus(uint32_t frameNum)
     {
+        static bool printProgressHeader = true;
         char buf[200];
         int64_t time = x265_mdate();
 
-        if (!bProgress || !frameNum || (prevUpdateTime && time - prevUpdateTime < UPDATE_INTERVAL))
+        if (!bProgress || !frameNum || (frameNum != framesToBeEncoded && prevUpdateTime && time - prevUpdateTime < UPDATE_INTERVAL))
             return;
 
+        if (printProgressHeader)
+        {
+            if (framesToBeEncoded)
+                fprintf(stderr, " %6s  %13s %5s %8s %9s %9s %7s    %7s\n",
+                    "", "frames   ", "fps ", "kb/s ", "elapsed", "remain ", "size", "est.size");
+            else
+                fprintf(stderr, "%6s  %5s  %8s  %9s  %7s\n", "frames", "fps ", "kb/s ", "elapsed", "size");
+            printProgressHeader = false;
+        }
+
         int64_t elapsed = time - startTime;
+        int secs = (int)(elapsed / 1000000);
         double fps = elapsed > 0 ? frameNum * 1000000. / elapsed : 0;
         float bitrate = 0.008f * totalbytes * (param->fpsNum / param->fpsDenom) / ((float)frameNum);
         if (framesToBeEncoded)
         {
             int eta = (int)(elapsed * (framesToBeEncoded - frameNum) / ((int64_t)frameNum * 1000000));
-            sprintf(buf, "x265 [%.1f%%] %d/%d frames, %.2f fps, %.2f kb/s, eta %d:%02d:%02d",
+            double estSize = (double)totalbytes * framesToBeEncoded / (frameNum * 1024.);
+            sprintf(buf, "x265 [%5.1f%%] %6d/%-6d %5.2f %8.2f %3d:%02d:%02d %3d:%02d:%02d %7.2f %1sB %7.2f %1sB",
                 100. * frameNum / (param->chunkEnd ? param->chunkEnd : param->totalFrames), frameNum, (param->chunkEnd ? param->chunkEnd : param->totalFrames), fps, bitrate,
-                eta / 3600, (eta / 60) % 60, eta % 60);
+                secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60,
+                totalbytes < 1048576 ? (double)totalbytes / 1024. : (double)totalbytes / 1048576., totalbytes < 1048576 ? "K" : "M",
+                estSize < 1024 ? estSize : estSize / 1024, estSize < 1024 ? "K" : "M");
         }
         else
-            sprintf(buf, "x265 %d frames: %.2f fps, %.2f kb/s", frameNum, fps, bitrate);
+            sprintf(buf, "x265 %6d  %5.2f  %8.2f  %3d:%02d:%02d  %7.2f %sB",
+                frameNum, fps, bitrate, secs / 3600, (secs / 60) % 60, secs % 60,
+                totalbytes < 1048576 ? (double)totalbytes / 1024. : (double)totalbytes / 1048576., totalbytes < 1048576 ? "K" : "M");
 
         fprintf(stderr, "%s  \r", buf + 5);
         SetConsoleTitle(buf);
