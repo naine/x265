@@ -28,6 +28,7 @@
 
 #include "common.h"
 #include "sei.h"
+#include "ringmem.h"
 
 namespace X265_NS {
 // encoder namespace
@@ -45,13 +46,6 @@ struct SPS;
 #define MIN_AMORTIZE_FRAME 10
 #define MIN_AMORTIZE_FRACTION 0.2
 #define CLIP_DURATION(f) x265_clip3(MIN_FRAME_DURATION, MAX_FRAME_DURATION, f)
-
-/*Scenecut Aware QP*/
-#define I_SLICE_DELTA           2   /* Subtracted from base QP for the scenecut I frames*/
-#define SLICE_TYPE_DELTA        0.3 /* The offset decremented or incremented for P-frames or b-frames respectively*/
-#define WINDOW1_DELTA           0   /* The offset for the frames coming in the window-1*/
-#define WINDOW2_DELTA           0.3 /* The offset for the frames coming in the window-2*/
-#define WINDOW3_DELTA           0.6 /* The offset for the frames coming in the window-3*/
 
 struct Predictor
 {
@@ -75,6 +69,7 @@ struct RateControlEntry
     Predictor  rowPreds[3][2];
     Predictor* rowPred[2];
 
+    int64_t currentSatd;
     int64_t lastSatd;      /* Contains the picture cost of the previous frame, required for resetAbr and VBV */
     int64_t leadingNoBSatd;
     int64_t rowTotalBits;  /* update cplxrsum and totalbits at the end of 2 rows */
@@ -89,6 +84,8 @@ struct RateControlEntry
     double  rowCplxrSum;
     double  qpNoVbv;
     double  bufferFill;
+    double  bufferFillFinal;
+    double  bufferFillActual;
     double  targetFill;
     bool    vbvEndAdj;
     double  frameDuration;
@@ -166,6 +163,8 @@ public:
     double m_avgPFrameQp;
     double m_bufferFillActual;
     double m_bufferExcess;
+    double m_minBufferFill;
+    double m_maxBufferFill;
     bool   m_isFirstMiniGop;
     Predictor m_pred[4];       /* Slice predictors to preidct bits for each Slice type - I,P,Bref and B */
     int64_t m_leadingNoBSatd;
@@ -237,6 +236,8 @@ public:
     FILE*   m_statFileOut;
     FILE*   m_cutreeStatFileOut;
     FILE*   m_cutreeStatFileIn;
+    ///< store the cutree data in memory instead of file
+    RingMem *m_cutreeShrMem;
     double  m_lastAccumPNorm;
     double  m_expectedBitsSum;   /* sum of qscale2bits after rceq, ratefactor, and overflow, only includes finished frames */
     int64_t m_predictedBits;
@@ -254,6 +255,7 @@ public:
     RateControl(x265_param& p, Encoder *enc);
     bool init(const SPS& sps);
     void initHRD(SPS& sps);
+    void initVBV(const SPS& sps);
     void reconfigureRC();
 
     void setFinalFrameCount(int count);
@@ -271,7 +273,11 @@ public:
     int writeRateControlFrameStats(Frame* curFrame, RateControlEntry* rce);
     bool   initPass2();
 
-    double scenecutAwareQp(Frame* curFrame, double q);
+    bool initCUTreeSharedMem();
+    void skipCUTreeSharedMemRead(int32_t cnt);
+
+    double forwardMasking(Frame* curFrame, double q);
+    double backwardMasking(Frame* curFrame, double q);
 
 protected:
 
@@ -310,6 +316,7 @@ protected:
     double tuneQScaleForGrain(double rcOverflow);
     void   splitdeltaPOC(char deltapoc[], RateControlEntry *rce);
     void   splitbUsed(char deltapoc[], RateControlEntry *rce);
+    void   checkAndResetCRF(RateControlEntry* rce);
 };
 }
 #endif // ifndef X265_RATECONTROL_H

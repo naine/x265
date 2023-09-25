@@ -32,6 +32,7 @@
 #include "nal.h"
 #include "framedata.h"
 #include "svt.h"
+#include "temporalfilter.h"
 #ifdef ENABLE_HDR10_PLUS
     #include "dynamicHDR10/hdr10plus.h"
 #endif
@@ -163,8 +164,11 @@ class RateControl;
 class ThreadPool;
 class FrameData;
 
-#define MAX_SCENECUT_THRESHOLD 2.0
+#define MAX_SCENECUT_THRESHOLD 1.0
 #define SCENECUT_STRENGTH_FACTOR 2.0
+#define MIN_EDGE_FACTOR 0.5
+#define MAX_EDGE_FACTOR 1.5
+#define SCENECUT_CHROMA_FACTOR 10.0
 
 class Encoder : public x265_encoder
 {
@@ -253,20 +257,6 @@ public:
     int                m_bToneMap; // Enables tone-mapping
     int                m_enableNal;
 
-    /* For histogram based scene-cut detection */
-    pixel*             m_edgePic;
-    pixel*             m_inputPic[3];
-    int32_t            m_curUVHist[2][HISTOGRAM_BINS];
-    int32_t            m_curMaxUVHist[HISTOGRAM_BINS];
-    int32_t            m_prevMaxUVHist[HISTOGRAM_BINS];
-    int32_t            m_curEdgeHist[2];
-    int32_t            m_prevEdgeHist[2];
-    uint32_t           m_planeSizes[3];
-    double             m_edgeHistThreshold;
-    double             m_chromaHistThreshold;
-    double             m_scaledEdgeThreshold;
-    double             m_scaledChromaThreshold;
-
 #ifdef ENABLE_HDR10_PLUS
     const hdr10plus_api     *m_hdr10plus_api;
     uint8_t                 **m_cim;
@@ -293,6 +283,9 @@ public:
 
     ThreadSafeInteger* zoneReadCount;
     ThreadSafeInteger* zoneWriteCount;
+    /* Film grain model file */
+    FILE* m_filmGrainIn;
+    OrigPicBuffer*          m_origPicBuffer;
 
     Encoder();
     ~Encoder()
@@ -324,6 +317,8 @@ public:
     int setAnalysisData(x265_analysis_data *analysis_data, int poc, uint32_t cuBytes);
 
     void getStreamHeaders(NALList& list, Entropy& sbacCoder, Bitstream& bs);
+
+    void getEndNalUnits(NALList& list, Bitstream& bs);
 
     void fetchStats(x265_stats* stats, size_t statsSizeBytes);
 
@@ -371,10 +366,6 @@ public:
 
     void copyPicture(x265_picture *dest, const x265_picture *src);
 
-    bool computeHistograms(x265_picture *pic);
-    void computeHistogramSAD(double *maxUVNormalizedSAD, double *edgeNormalizedSAD, int curPoc);
-    void findSceneCuts(x265_picture *pic, bool& bDup, double m_maxUVSADVal, double m_edgeSADVal);
-
     void initRefIdx();
     void analyseRefIdx(int *numRefIdx);
     void updateRefIdx();
@@ -383,6 +374,11 @@ public:
     void copyUserSEIMessages(Frame *frame, const x265_picture* pic_in);
 
     void configureDolbyVisionParams(x265_param* p);
+
+    void configureVideoSignalTypePreset(x265_param* p);
+
+    bool isFilterThisframe(uint8_t sliceTypeConfig, int curSliceType);
+    bool generateMcstfRef(Frame* frameEnc, FrameEncoder* currEncoder);
 
 protected:
 
