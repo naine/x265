@@ -151,7 +151,15 @@ else()
         )
     execute_process(
         COMMAND
-        ${GIT_EXECUTABLE} rev-list ${X265_LATEST_TAG}.. --count --first-parent
+        ${GIT_EXECUTABLE} merge-base origin/master HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE X265_ANCESTOR_REV
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    execute_process(
+        COMMAND
+        ${GIT_EXECUTABLE} rev-list ${X265_LATEST_TAG}..${X265_ANCESTOR_REV} --count --first-parent
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         OUTPUT_VARIABLE X265_TAG_DISTANCE
         ERROR_QUIET
@@ -159,7 +167,7 @@ else()
         )
     execute_process(
         COMMAND
-        ${GIT_EXECUTABLE} log --pretty=format:%h -n 1
+        ${GIT_EXECUTABLE} log --pretty=format:%h -n 1 ${X265_ANCESTOR_REV}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         OUTPUT_VARIABLE X265_REVISION_ID
         ERROR_QUIET
