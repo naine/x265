@@ -28,10 +28,11 @@
 
 #if _WIN32
 #include <sys/types.h>
-#include <sys/timeb.h>
+#include <windows.h>
 #include <io.h>
 #include <fcntl.h>
 #else
+#include <time.h>
 #include <sys/time.h>
 #endif
 
@@ -44,9 +45,20 @@ int g_checkFailures;
 int64_t x265_mdate(void)
 {
 #if _WIN32
-    struct timeb tb;
-    ftime(&tb);
-    return ((int64_t)tb.time * 1000 + (int64_t)tb.millitm) * 1000;
+    static LONGLONG freq_us = 0;
+    LARGE_INTEGER result;
+    if (!freq_us)
+    {
+        QueryPerformanceFrequency(&result);
+        /* Resolution documented to be at least a microsecond. */
+        freq_us = result.QuadPart / 1000000;
+    }
+    QueryPerformanceCounter(&result);
+    return result.QuadPart / freq_us;
+#elif _POSIX_C_SOURCE >= 199309L
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + (int64_t)ts.tv_nsec / 1000;
 #else
     struct timeval tv_date;
     gettimeofday(&tv_date, NULL);
