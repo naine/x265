@@ -2732,14 +2732,14 @@ void Encoder::printSummary()
     if (m_analyzeAll.m_numPics)
     {
         int p = 0;
-        int64_t endTime = x265_mdate();
-        int secs = (int)((endTime - m_encodeStartTime) / 1000000);
-        double elapsedEncodeTime = (double)(endTime - m_encodeStartTime) / 1000000;
+        int64_t elapsed_us = x265_mdate() - m_encodeStartTime;
+        int secs = (int)(elapsed_us / 1000000);
+        double elapsedEncodeTime = (double)elapsed_us / 1000000;
         double elapsedVideoTime = (double)m_analyzeAll.m_numPics * m_param->fpsDenom / m_param->fpsNum;
         double bitrate = (0.001f * m_analyzeAll.m_accBits) / elapsedVideoTime;
 
         p += sprintf(buffer + p, "\nencoded %d frames in %d:%02d:%02d.%02d (%.2f fps), %.2f kb/s, Avg QP:%2.2lf", m_analyzeAll.m_numPics,
-            secs / 3600, (secs / 60) % 60, secs % 60, (int)((endTime - m_encodeStartTime) % 1000000 / 10000),
+            secs / 3600, (secs / 60) % 60, secs % 60, (int)(elapsed_us % 1000000 / 10000),
             m_analyzeAll.m_numPics / elapsedEncodeTime, bitrate, m_analyzeAll.m_totalQp / (double)m_analyzeAll.m_numPics);
 
         if (m_param->bEnablePsnr)
