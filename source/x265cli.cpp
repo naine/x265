@@ -438,21 +438,20 @@ namespace X265_NS {
 
     void CLIOptions::printStatus(uint32_t frameNum)
     {
-        static bool printProgressHeader = true;
         char buf[200];
         int64_t time = x265_mdate();
 
         if (!bProgress || !frameNum || (frameNum != framesToBeEncoded && prevUpdateTime && time - prevUpdateTime < UPDATE_INTERVAL))
             return;
 
-        if (printProgressHeader)
+        if (!headerPrinted)
         {
             if (framesToBeEncoded)
                 fprintf(stderr, " %6s  %13s %5s %8s %9s %9s %7s    %7s\n",
                     "", "frames   ", "fps ", "kb/s ", "elapsed", "remain ", "size", "est.size");
             else
                 fprintf(stderr, "%6s  %5s  %8s  %9s  %7s\n", "frames", "fps ", "kb/s ", "elapsed", "size");
-            printProgressHeader = false;
+            headerPrinted = true;
         }
 
         int64_t elapsed = time - startTime;
@@ -463,7 +462,7 @@ namespace X265_NS {
         {
             int eta = (int)(elapsed * (framesToBeEncoded - frameNum) / ((int64_t)frameNum * 1000000));
             double estSize = (double)totalbytes * framesToBeEncoded / (frameNum * 1024.);
-            sprintf(buf, "x265 [%5.1f%%] %6d/%-6d %5.2f %8.2f %3d:%02d:%02d %3d:%02d:%02d %7.2f %1sB %7.2f %1sB",
+            sprintf(buf, "x265 [%5.1f%%] %6d/%-6d %5.2f %8.2f %3d:%02d:%02d %3d:%02d:%02d %7.2f %sB %7.2f %sB",
                 100. * frameNum / (param->chunkEnd ? param->chunkEnd : param->totalFrames), frameNum, (param->chunkEnd ? param->chunkEnd : param->totalFrames), fps, bitrate,
                 secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60,
                 totalbytes < 1048576 ? (double)totalbytes / 1024. : (double)totalbytes / 1048576., totalbytes < 1048576 ? "K" : "M",

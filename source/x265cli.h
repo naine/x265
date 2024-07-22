@@ -412,6 +412,7 @@ static const struct option long_options[] =
         uint64_t totalbytes;
         int64_t startTime;
         int64_t prevUpdateTime;
+        bool headerPrinted;
 
         int argCnt;
         char** argString;
@@ -448,6 +449,7 @@ static const struct option long_options[] =
             bForceY4m = false;
             startTime = x265_mdate();
             prevUpdateTime = 0;
+            headerPrinted = false;
             bDither = false;
             isAbrLadderConfig = false;
             enableScaler = false;
