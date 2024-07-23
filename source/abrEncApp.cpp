@@ -755,7 +755,11 @@ ret:
                                 pts_queue->pop();
                         }
                     }
-                    m_cliopt.printStatus(outFrameCount);
+                    // printStatus must be called once for every frame
+                    for (int i = numEncoded - 1; i >= 0; i--)
+                    {
+                        m_cliopt.printStatus(outFrameCount - i, false);
+                    }
                 }
             }
 
@@ -791,10 +795,21 @@ ret:
                     }
                 }
 
-                m_cliopt.printStatus(outFrameCount);
+                // printStatus must be called once for every frame
+                for (int i = numEncoded - 1; i >= 0; i--)
+                {
+                    m_cliopt.printStatus(outFrameCount - i, false);
+                }
 
                 if (!numEncoded)
                     break;
+            }
+
+            // Update and finalize progress report.
+            if (m_cliopt.bProgress)
+            {
+                m_cliopt.printStatus(outFrameCount, true);
+                fprintf(stderr, "\n");
             }
 
             if (bDolbyVisionRPU)
@@ -805,10 +820,6 @@ ret:
                 x265_log(NULL, X265_LOG_INFO, "VES muxing with Dolby Vision RPU file successful in %s\n",
                     profileName);
             }
-
-            /* clear progress report */
-            if (m_cliopt.bProgress)
-                fprintf(stderr, "\n");
 
         fail:
 

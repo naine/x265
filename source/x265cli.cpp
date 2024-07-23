@@ -436,41 +436,67 @@ namespace X265_NS {
         output = NULL;
     }
 
-    void CLIOptions::printStatus(uint32_t frameNum)
+    void CLIOptions::printStatus(uint32_t frameNum, bool finalize)
     {
         char buf[200];
         int64_t time = x265_mdate();
+        frameTimes[frameNum % X265CLI_NUM_FRAME_TIMES] = time;
 
-        if (!bProgress || !frameNum || (frameNum != framesToBeEncoded && prevUpdateTime && time - prevUpdateTime < UPDATE_INTERVAL))
+        if (!bProgress || !frameNum || (!finalize && prevUpdateTime && time - prevUpdateTime < UPDATE_INTERVAL))
             return;
 
         if (!headerPrinted)
         {
             if (framesToBeEncoded)
-                fprintf(stderr, " %6s  %13s %5s %8s %9s %9s %7s    %7s\n",
-                    "", "frames   ", "fps ", "kb/s ", "elapsed", "remain ", "size", "est.size");
+                fprintf(stderr, " %6s  %13s %6s %6s %8s %9s %9s %7s    %7s\n",
+                    "", "frames   ", "fps ", "avgfps", "kb/s ", "elapsed", "remain ", "size", "est.size");
             else
-                fprintf(stderr, "%6s  %5s  %8s  %9s  %7s\n", "frames", "fps ", "kb/s ", "elapsed", "size");
+                fprintf(stderr, "%6s %6s %6s %8s %9s %7s\n", "frames", "fps ", "avgfps", "kb/s ", "elapsed", "size");
             headerPrinted = true;
         }
+
+#define FPS_WINDOW_MIN_FRAMES 5
+#define FPS_WINDOW_US 60000000
 
         int64_t elapsed = time - startTime;
         int secs = (int)(elapsed / 1000000);
         double fps = elapsed > 0 ? frameNum * 1000000. / elapsed : 0;
+        double fps_curr = fps;
+        if (frameNum > 1)
+        {
+            uint32_t oldest = frameNum >= X265CLI_NUM_FRAME_TIMES ? frameNum + 1 - X265CLI_NUM_FRAME_TIMES : 1;
+            int64_t window_elapsed = time - frameTimes[oldest % X265CLI_NUM_FRAME_TIMES];
+            if (window_elapsed <= FPS_WINDOW_US || frameNum <= FPS_WINDOW_MIN_FRAMES)
+            {
+                fps_curr = window_elapsed > 0 ? (frameNum - oldest) * 1000000. / window_elapsed : 0;
+            }
+            else
+            {
+                for (uint32_t i = frameNum - FPS_WINDOW_MIN_FRAMES; i >= oldest; i--)
+                {
+                    window_elapsed = time - frameTimes[i % X265CLI_NUM_FRAME_TIMES];
+                    if (window_elapsed >= FPS_WINDOW_US)
+                    {
+                        fps_curr = (frameNum - i) * 1000000. / window_elapsed;
+                        break;
+                    }
+                }
+            }
+        }
         double bitrate = 0.008 * totalbytes * (param->fpsNum / (double)param->fpsDenom) / frameNum;
         if (framesToBeEncoded)
         {
-            int eta = (int)(elapsed * (framesToBeEncoded - frameNum) / ((int64_t)frameNum * 1000000));
+            int eta = elapsed > 0 ? (int)((framesToBeEncoded - frameNum) / fps_curr) : 0;
             double estSize = (double)totalbytes * framesToBeEncoded / (frameNum * 1024.);
-            sprintf(buf, "x265 [%5.1f%%] %6d/%-6d %5.2f %8.2f %3d:%02d:%02d %3d:%02d:%02d %7.2f %sB %7.2f %sB",
-                100. * frameNum / (param->chunkEnd ? param->chunkEnd : param->totalFrames), frameNum, (param->chunkEnd ? param->chunkEnd : param->totalFrames), fps, bitrate,
-                secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60,
+            sprintf(buf, "x265 [%5.1f%%] %6d/%-6d %6.2f %6.2f %8.2f %3d:%02d:%02d %3d:%02d:%02d %7.2f %sB %7.2f %sB",
+                100. * frameNum / (param->chunkEnd ? param->chunkEnd : param->totalFrames), frameNum, (param->chunkEnd ? param->chunkEnd : param->totalFrames),
+                fps_curr, fps, bitrate, secs / 3600, (secs / 60) % 60, secs % 60, eta / 3600, (eta / 60) % 60, eta % 60,
                 totalbytes < 1048576 ? (double)totalbytes / 1024. : (double)totalbytes / 1048576., totalbytes < 1048576 ? "K" : "M",
                 estSize < 1024 ? estSize : estSize / 1024, estSize < 1024 ? "K" : "M");
         }
         else
-            sprintf(buf, "x265 %6d  %5.2f  %8.2f  %3d:%02d:%02d  %7.2f %sB",
-                frameNum, fps, bitrate, secs / 3600, (secs / 60) % 60, secs % 60,
+            sprintf(buf, "x265 %6d %6.2f %6.2f %8.2f %3d:%02d:%02d %7.2f %sB",
+                frameNum, fps_curr, fps, bitrate, secs / 3600, (secs / 60) % 60, secs % 60,
                 totalbytes < 1048576 ? (double)totalbytes / 1024. : (double)totalbytes / 1048576., totalbytes < 1048576 ? "K" : "M");
 
         fprintf(stderr, "%s  \r", buf + 5);

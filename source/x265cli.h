@@ -391,6 +391,8 @@ static const struct option long_options[] =
     { 0, 0, 0, 0 }
 };
 
+#define X265CLI_NUM_FRAME_TIMES 512
+
     struct CLIOptions
     {
         InputFile* input;
@@ -412,6 +414,7 @@ static const struct option long_options[] =
         uint64_t totalbytes;
         int64_t startTime;
         int64_t prevUpdateTime;
+        int64_t frameTimes[X265CLI_NUM_FRAME_TIMES];
         bool headerPrinted;
 
         int argCnt;
@@ -464,7 +467,7 @@ static const struct option long_options[] =
         }
 
         void destroy();
-        void printStatus(uint32_t frameNum);
+        void printStatus(uint32_t frameNum, bool finalize);
         bool parse(int argc, char **argv);
         bool parseZoneParam(int argc, char **argv, x265_param* globalParam, int zonefileCount);
         bool parseQPFile(x265_picture &pic_org);
