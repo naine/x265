@@ -2736,7 +2736,7 @@ void Encoder::printSummary()
         int secs = (int)(elapsed_us / 1000000);
         double elapsedEncodeTime = (double)elapsed_us / 1000000;
         double elapsedVideoTime = (double)m_analyzeAll.m_numPics * m_param->fpsDenom / m_param->fpsNum;
-        double bitrate = (0.001f * m_analyzeAll.m_accBits) / elapsedVideoTime;
+        double bitrate = (0.001 * m_analyzeAll.m_accBits) / elapsedVideoTime;
 
         p += sprintf(buffer + p, "\nencoded %d frames in %d:%02d:%02d.%02d (%.2f fps), %.2f kb/s, Avg QP:%2.2lf", m_analyzeAll.m_numPics,
             secs / 3600, (secs / 60) % 60, secs % 60, (int)(elapsed_us % 1000000 / 10000),

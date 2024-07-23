@@ -457,7 +457,7 @@ namespace X265_NS {
         int64_t elapsed = time - startTime;
         int secs = (int)(elapsed / 1000000);
         double fps = elapsed > 0 ? frameNum * 1000000. / elapsed : 0;
-        float bitrate = 0.008f * totalbytes * (param->fpsNum / param->fpsDenom) / ((float)frameNum);
+        double bitrate = 0.008 * totalbytes * (param->fpsNum / (double)param->fpsDenom) / frameNum;
         if (framesToBeEncoded)
         {
             int eta = (int)(elapsed * (framesToBeEncoded - frameNum) / ((int64_t)frameNum * 1000000));
