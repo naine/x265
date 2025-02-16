@@ -358,6 +358,17 @@ static const struct option long_options[] =
     { "dup-threshold", required_argument, NULL, 0 },
     { "mcstf",                 no_argument, NULL, 0 },
     { "no-mcstf",              no_argument, NULL, 0 },
+#if ENABLE_ALPHA
+    { "alpha",                 no_argument, NULL, 0 },
+#endif
+#if ENABLE_MULTIVIEW
+    { "num-views", required_argument, NULL, 0 },
+    { "multiview-config", required_argument, NULL, 0 },
+    { "format", required_argument, NULL, 0 },
+#endif
+#if ENABLE_SCC_EXT
+    { "scc",        required_argument, NULL, 0 },
+#endif
 #ifdef SVT_HEVC
     { "svt",     no_argument, NULL, 0 },
     { "no-svt",  no_argument, NULL, 0 },
@@ -384,6 +395,9 @@ static const struct option long_options[] =
     { "max-vbv-fullness", required_argument, NULL, 0 },
     { "scenecut-qp-config", required_argument, NULL, 0 },
     { "film-grain", required_argument, NULL, 0 },
+    { "aom-film-grain", required_argument, NULL, 0 },
+    { "frame-rc",no_argument, NULL, 0 },
+    { "no-frame-rc",no_argument, NULL, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 },
     { 0, 0, 0, 0 },
@@ -395,13 +409,16 @@ static const struct option long_options[] =
 
     struct CLIOptions
     {
-        InputFile* input;
-        ReconFile* recon;
+        InputFile* input[MAX_VIEWS];
+        ReconFile* recon[MAX_LAYERS];
         OutputFile* output;
         FILE*       qpfile;
         FILE*       zoneFile;
         FILE*    dolbyVisionRpu;    /* File containing Dolby Vision BL RPU metadata */
         FILE*    scenecutAwareQpConfig; /* File containing scenecut aware frame quantization related CLI options */
+#if ENABLE_MULTIVIEW
+        FILE* multiViewConfig; /* File containing multi-view related CLI options */
+#endif
         const char* reconPlayCmd;
         const x265_api* api;
         x265_param* param;
@@ -418,13 +435,15 @@ static const struct option long_options[] =
         bool headerPrinted;
 
         int argCnt;
+        char** orgArgv;
         char** argString;
+        char *stringPool;
 
         /* ABR ladder settings */
         bool isAbrLadderConfig;
         bool enableScaler;
-        char*    encName;
-        char*    reuseName;
+        char     encName[X265_MAX_STRING_SIZE];
+        char     reuseName[X265_MAX_STRING_SIZE];
         uint32_t encId;
         int      refId;
         uint32_t loadLevel;
@@ -435,13 +454,18 @@ static const struct option long_options[] =
         static const int UPDATE_INTERVAL = 250000;
         CLIOptions()
         {
-            input = NULL;
-            recon = NULL;
+            for (int i = 0; i < MAX_VIEWS; i++)
+                input[i] = NULL;
+            for (int i = 0; i < MAX_LAYERS; i++)
+                recon[i] = NULL;
             output = NULL;
             qpfile = NULL;
             zoneFile = NULL;
             dolbyVisionRpu = NULL;
             scenecutAwareQpConfig = NULL;
+#if ENABLE_MULTIVIEW
+            multiViewConfig = NULL;
+#endif
             reconPlayCmd = NULL;
             api = NULL;
             param = NULL;
@@ -456,14 +480,17 @@ static const struct option long_options[] =
             bDither = false;
             isAbrLadderConfig = false;
             enableScaler = false;
-            encName = NULL;
-            reuseName = NULL;
+            encName[0] = 0;
+            reuseName[0] = 0;
             encId = 0;
             refId = -1;
             loadLevel = 0;
             saveLevel = 0;
             numRefs = 0;
             argCnt = 0;
+            orgArgv = NULL;
+            argString = NULL;
+            stringPool = NULL;
         }
 
         void destroy();
@@ -475,6 +502,9 @@ static const struct option long_options[] =
         int rpuParser(x265_picture * pic);
         bool parseScenecutAwareQpConfig();
         bool parseScenecutAwareQpParam(int argc, char **argv, x265_param* globalParam);
+#if ENABLE_MULTIVIEW
+        bool parseMultiViewConfig(char** fn);
+#endif
     };
 #ifdef __cplusplus
 }
